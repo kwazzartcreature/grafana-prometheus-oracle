@@ -1,0 +1,65 @@
+services:
+  oracle-db:
+    image: gvenzl/oracle-free:latest
+    container_name: oracle-db
+    ports:
+      - "1521:1521"
+      - "5500:5500"
+    environment:
+      ORACLE_PASSWORD: MYgmeSr5HUT5
+      APP_USER: app
+      APP_USER_PASSWORD: MYgmeSr5HUT5
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "echo 'SELECT 1 FROM DUAL;' | sqlplus -s SYSTEM/MYgmeSr5HUT5@localhost/freepdb1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - ./oracle/init.sql:/container-entrypoint-initdb.d/init.sql:ro
+    restart: always
+
+  oracledb-exporter:
+    image: iamseth/oracledb_exporter:latest
+    # volumes:
+    # - ./exporter/metrics.toml:/metrics.toml
+    ports:
+      - "9161:9161"
+    environment:
+      # - DATA_SOURCE_NAME=system/MYgmeSr5HUT5@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=oracle-db)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=freepdb1)))
+      # - DATA_SOURCE_NAME=exporter/exporter_password@//oracle-db:1521/freepdb1
+      - DATA_SOURCE_NAME=oracle://exporter:exporter_password@oracle-db:1521/freepdb1
+      # - METRICS_FILE=/metrics.toml
+    depends_on:
+      - oracle-db
+    restart: always
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    depends_on:
+      - oracledb-exporter
+    restart: always
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=nGLzt7XRm247
+    depends_on:
+      - prometheus
+    volumes:
+      - ./grafana/data:/var/lib/grafana
+    restart: always
