@@ -1,0 +1,29 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    depends_on:
+      - oracledb-exporter
+    restart: always
+
+  oracledb-exporter:
+    build:
+      context: ./exporter
+      dockerfile: Dockerfile
+    ports:
+      - "9161:9161"
+    environment:
+      - DATA_SOURCE_NAME=oracle://${EXPORTER_DBNAME}:${EXPORTER_DBPASSWORD}@${ORACLEDB_HOST}:${ORACLEDB_PORT}/${ORACLEDB_DBNAME}
+    depends_on:
+      - oracle-db
+    restart: always
+
+volumes:
+  prometheus_data:

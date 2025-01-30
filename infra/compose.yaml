@@ -1,7 +1,6 @@
 services:
   oracle-db:
     image: gvenzl/oracle-free:latest
-    container_name: oracle-db
     ports:
       - "1521:1521"
       - "5500:5500"
@@ -23,36 +22,33 @@ services:
     restart: always
 
   oracledb-exporter:
-    image: iamseth/oracledb_exporter:latest
-    # volumes:
-    # - ./exporter/metrics.toml:/metrics.toml
+    build:
+      context: ./exporter
+      dockerfile: Dockerfile
     ports:
       - "9161:9161"
     environment:
-      # - DATA_SOURCE_NAME=system/MYgmeSr5HUT5@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=oracle-db)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=freepdb1)))
-      # - DATA_SOURCE_NAME=exporter/exporter_password@//oracle-db:1521/freepdb1
       - DATA_SOURCE_NAME=oracle://exporter:exporter_password@oracle-db:1521/freepdb1
-      # - METRICS_FILE=/metrics.toml
     depends_on:
       - oracle-db
     restart: always
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
     ports:
       - "9090:9090"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
     depends_on:
       - oracledb-exporter
     restart: always
 
   grafana:
     image: grafana/grafana:latest
-    container_name: grafana
     ports:
       - "3002:3000"
     environment:
@@ -63,3 +59,6 @@ services:
     volumes:
       - ./grafana/data:/var/lib/grafana
     restart: always
+
+volumes:
+  prometheus_data:
